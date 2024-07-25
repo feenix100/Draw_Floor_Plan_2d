@@ -6,6 +6,8 @@
 
 This web app allows users to draw a 2D floor plan of a house or building. Click and drag the mouse to draw a square. It provides a simple and interactive way to visualize floor plans directly in the browser.
 
+## To use: open index.html in a browser.
+
 ## Features
 
 - **Dynamic Drawing**: Automatically updates the floor plan based on the dimensions entered by the user.
