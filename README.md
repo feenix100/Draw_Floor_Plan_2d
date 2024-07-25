@@ -4,7 +4,7 @@
 
 ## Overview
 
-This web app allows users to draw a 2D floor plan by entering the dimensions of rooms, closets, and doors. The app automatically adjusts the drawing based on the input values and ensures that the dimensions fit within 75% of the window size. It provides a simple and interactive way to visualize floor plans directly in the browser.
+This web app allows users to draw a 2D floor plan of a house or building. Click and drag the mouse to draw a square. It provides a simple and interactive way to visualize floor plans directly in the browser.
 
 ## Features
 
