@@ -1,43 +1,425 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Floor Plan Drawer</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+        canvas {
+            border: 1px solid black;
         }
-        #container {
+        .label-input {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 1;
+            width: 60px;
+            text-align: center;
         }
-        #floorPlan {
-            background-color: #f0f0f0;
-            display: block;
+        .button-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px; /* Adjust the gap between buttons as needed */
         }
-        input {
-            margin: 5px;
+        .remove-button,
+        .shape-toggle-button,
+        .snap-toggle-button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
         }
+        #history {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid black;
+            padding: 10px;
+        }
+        #history ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        
+        #historyList {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #historyList li {
+            padding: 5px;
+            border: 1px solid #ccc;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+
+        #historyList li.selected {
+            background-color: #e0e0e0;
+            border-color: #000;
+        }
+
+        .delete-button {
+            margin-left: 10px;
+            background-color: red;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+</style>
+
+
     </style>
 </head>
 <body>
-    <div id="container">
-        <h1>2D Floor Plan Drawer</h1>
-        <div>
-            <label for="width">Width (px):</label>
-            <input type="number" id="width" min="1">
-            <label for="height">Height (px):</label>
-            <input type="number" id="height" min="1">
-            <button onclick="drawFloorPlan()">Draw Floor Plan</button>
-        </div>
-    </div>
+    <input type="number" id="width" placeholder="Width (ft)">
+    <input type="number" id="height" placeholder="Height (ft)">
+    <input type="number" id="totalArea" placeholder="Total Area (sq ft)">
     <canvas id="floorPlan"></canvas>
-    <script src="app.js"></script>
+    <div class="button-container">
+        <button id="removeButton" class="remove-button">Remove</button>
+        <button id="shapeToggleButton" class="shape-toggle-button">Shape Toggle</button>
+        <button id="snapToggleButton" class="snap-toggle-button">Snap On</button>
+    </div>
+    <div id="history">
+        <h3>History</h3>
+        <ul id="historyList"></ul>
+    </div>
+
+    <script>
+        let isDrawing = false;
+        let isRemoving = false;
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let currentY = 0;
+        let shapes = [];
+        let selectedShapes = [];
+        let isDrawingLines = false;
+        let isSnapping = false;
+        let selectedHistoryIndex = null;
+    
+        const gridSize = 20; // Set the grid size for snapping
+    
+        function resizeCanvas() {
+            const canvas = document.getElementById('floorPlan');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawShapes(); // Redraw the floor plan when the canvas is resized
+        }
+    
+        function drawShapes() {
+            const canvas = document.getElementById('floorPlan');
+            const ctx = canvas.getContext('2d');
+    
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+            // Calculate maximum dimensions as 75% of the canvas size
+            const maxWidth = canvas.width * 0.75;
+            const maxHeight = canvas.height * 0.75;
+    
+            // Get user inputs
+            const inputWidth = parseInt(document.getElementById('width').value, 10);
+            const inputHeight = parseInt(document.getElementById('height').value, 10);
+    
+            // Constrain dimensions to fit within 75% of canvas size
+            const width = isNaN(inputWidth) ? maxWidth : Math.max(inputWidth, 0); // Ensure non-negative
+            const height = isNaN(inputHeight) ? maxHeight : Math.max(inputHeight, 0); // Ensure non-negative
+    
+            // Calculate scale factor
+            const scaleX = width / inputWidth;
+            const scaleY = height / inputHeight;
+            const scale = Math.min(scaleX, scaleY);
+    
+            // Adjust the dimensions based on the scale factor
+            const drawWidth = Math.max(inputWidth * scale, 0); // Ensure non-negative
+            const drawHeight = Math.max(inputHeight * scale, 0); // Ensure non-negative
+    
+            // Draw the floor plan based on the constrained dimensions
+            ctx.beginPath();
+            ctx.rect((canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+    
+            // Label the dimensions
+            ctx.font = '16px Arial';
+            ctx.fillStyle = 'black';
+    
+            // Width label
+            ctx.fillText(`Width: ${Math.abs(inputWidth)} ft`, (canvas.width - drawWidth) / 2 + drawWidth / 2 - 50, (canvas.height - drawHeight) / 2 - 10);
+    
+            // Height label
+            ctx.save();
+            ctx.translate((canvas.width - drawWidth) / 2 - 60, (canvas.height - drawHeight) / 2 + drawHeight / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText(`Height: ${Math.abs(inputHeight)} ft`, 0, 0);
+            ctx.restore();
+    
+            // Area label
+            const area = Math.abs(inputWidth * inputHeight); // Ensure non-negative
+            ctx.fillText(`Area: ${area} sq ft`, (canvas.width - drawWidth) / 2 + drawWidth / 2 - 50, (canvas.height - drawHeight) / 2 + drawHeight + 20);
+    
+            // Remove existing input fields
+            const existingInputs = document.querySelectorAll('.label-input');
+            existingInputs.forEach(input => input.remove());
+    
+            // Draw all stored shapes and labels
+            shapes.forEach((shape, index) => {
+                ctx.beginPath();
+                if (shape.type === 'box') {
+                    ctx.rect(shape.x, shape.y, shape.width, shape.height);
+                } else if (shape.type === 'line') {
+                    ctx.moveTo(shape.startX, shape.startY);
+                    ctx.lineTo(shape.endX, shape.endY);
+                    // Draw measurement label for the line
+                    const length = Math.sqrt(Math.pow(shape.endX - shape.startX, 2) + Math.pow(shape.endY - shape.startY, 2));
+                    const labelX = (shape.startX + shape.endX) / 2;
+                    const labelY = (shape.startY + shape.endY) / 2;
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = 'black';
+                    ctx.fillText(`${Math.round(length)} ft`, labelX, labelY - 10);
+                }
+                ctx.strokeStyle = selectedShapes.includes(index) ? 'red' : 'blue';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+    
+                // Create and position input fields for the labels
+                createLabelInputs(shape, index);
+            });
+    
+            // Draw the shape if dragging
+            if (isDrawing) {
+                ctx.beginPath();
+                if (isDrawingLines) {
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(currentX, currentY);
+                } else {
+                    const drawWidth = Math.max(currentX - startX, 0); // Ensure positive width
+                    const drawHeight = Math.max(currentY - startY, 0); // Ensure positive height
+                    ctx.rect(startX, startY, drawWidth, drawHeight);
+                }
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+    
+        function createLabelInputs(shape, index) {
+            const canvas = document.getElementById('floorPlan');
+            const container = canvas.parentElement;
+    
+            if (shape.type === 'box') {
+                // Top label
+                const topInput = document.createElement('input');
+                topInput.type = 'text';
+                topInput.value = `${Math.abs(shape.width)} ft`;
+                topInput.className = 'label-input';
+                topInput.style.left = `${shape.x + canvas.offsetLeft + shape.width / 2 - 30}px`;
+                topInput.style.top = `${shape.y + canvas.offsetTop - 20}px`;
+                topInput.dataset.index = index;
+                topInput.dataset.position = 'top';
+                topInput.addEventListener('change', updateLabel);
+                container.appendChild(topInput);
+    
+                // Left label
+                const leftInput = document.createElement('input');
+                leftInput.type = 'text';
+                leftInput.value = `${Math.abs(shape.height)} ft`;
+                leftInput.className = 'label-input';
+                leftInput.style.left = `${shape.x + canvas.offsetLeft - 60}px`;
+                leftInput.style.top = `${shape.y + canvas.offsetTop + shape.height / 2 - 10}px`;
+                leftInput.dataset.index = index;
+                leftInput.dataset.position = 'left';
+                leftInput.addEventListener('change', updateLabel);
+                container.appendChild(leftInput);
+    
+            } else if (shape.type === 'line') {
+                // Length label
+                const length = Math.sqrt(Math.pow(shape.endX - shape.startX, 2) + Math.pow(shape.endY - shape.startY, 2));
+                const labelX = (shape.startX + shape.endX) / 2;
+                const labelY = (shape.startY + shape.endY) / 2;
+    
+                const lengthInput = document.createElement('input');
+                lengthInput.type = 'text';
+                lengthInput.value = `${Math.round(length)} ft`;
+                lengthInput.className = 'label-input';
+                lengthInput.style.left = `${labelX + canvas.offsetLeft - 30}px`;
+                lengthInput.style.top = `${labelY + canvas.offsetTop - 20}px`;
+                lengthInput.dataset.index = index;
+                lengthInput.dataset.position = 'length';
+                lengthInput.addEventListener('change', updateLabel);
+                container.appendChild(lengthInput);
+            }
+        }
+    
+        function updateLabel(event) {
+            const index = event.target.dataset.index;
+            const position = event.target.dataset.position;
+            const value = parseInt(event.target.value, 10);
+    
+            if (isNaN(value)) return; // Ignore invalid inputs
+    
+            if (shapes[index].type === 'box') {
+                if (position === 'top') {
+                    shapes[index].width = Math.max(value, 0); // Ensure non-negative
+                } else if (position === 'left') {
+                    shapes[index].height = Math.max(value, 0); // Ensure non-negative
+                }
+            } else if (shapes[index].type === 'line' && position === 'length') {
+                // Handle length update for lines (optional)
+            }
+    
+            drawShapes();
+        }
+    
+        function addToHistory(shape) {
+            const historyList = document.getElementById('historyList');
+            const listItem = document.createElement('li');
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.className = 'delete-button';
+            deleteButton.dataset.index = historyList.children.length;
+            deleteButton.addEventListener('click', removeHistoryItem);
+    
+            if (shape.type === 'box') {
+                listItem.textContent = `Box created at (${shape.x}, ${shape.y}) with width ${shape.width} ft and height ${shape.height} ft`;
+            } else if (shape.type === 'line') {
+                listItem.textContent = `Line created from (${shape.startX}, ${shape.startY}) to (${shape.endX}, ${shape.endY})`;
+            }
+            listItem.appendChild(deleteButton);
+            listItem.dataset.index = historyList.children.length;
+            listItem.addEventListener('click', () => selectHistoryItem(listItem));
+            historyList.appendChild(listItem);
+        }
+    
+        function selectHistoryItem(item) {
+            const index = parseInt(item.dataset.index, 10);
+            selectedHistoryIndex = index;
+    
+            // Highlight selected history item
+            document.querySelectorAll('#historyList li').forEach(li => {
+                li.classList.remove('selected');
+            });
+            item.classList.add('selected');
+        }
+    
+        function removeHistoryItem(event) {
+            const index = parseInt(event.target.dataset.index, 10);
+    
+            // Remove item from the history list
+            const historyList = document.getElementById('historyList');
+            historyList.children[index].remove();
+    
+            // Remove corresponding shape from the canvas
+            shapes.splice(index, 1);
+            drawShapes();
+        }
+    
+        function toggleShape() {
+            isDrawingLines = !isDrawingLines;
+            document.getElementById('shapeToggleButton').innerText = isDrawingLines ? 'Draw Box' : 'Draw Line';
+        }
+    
+        function toggleSnap() {
+            isSnapping = !isSnapping;
+            document.getElementById('snapToggleButton').innerText = isSnapping ? 'Snap On' : 'Snap Off';
+        }
+    
+        document.getElementById('shapeToggleButton').addEventListener('click', toggleShape);
+        document.getElementById('snapToggleButton').addEventListener('click', toggleSnap);
+    
+        const canvas = document.getElementById('floorPlan');
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+    
+            if (isSnapping) {
+                startX = Math.round(startX / gridSize) * gridSize;
+                startY = Math.round(startY / gridSize) * gridSize;
+            }
+    
+            if (isRemoving) {
+                const shapeIndex = shapes.findIndex(shape => {
+                    if (shape.type === 'box') {
+                        return startX >= shape.x && startX <= shape.x + shape.width && startY >= shape.y && startY <= shape.y + shape.height;
+                    } else if (shape.type === 'line') {
+                        const distanceToStart = Math.sqrt(Math.pow(startX - shape.startX, 2) + Math.pow(startY - shape.startY, 2));
+                        const distanceToEnd = Math.sqrt(Math.pow(startX - shape.endX, 2) + Math.pow(startY - shape.endY, 2));
+                        const lineLength = Math.sqrt(Math.pow(shape.endX - shape.startX, 2) + Math.pow(shape.endY - shape.startY, 2));
+                        return distanceToStart + distanceToEnd <= lineLength + 1; // Tolerance for line selection
+                    }
+                });
+    
+                if (shapeIndex !== -1) {
+                    if (selectedShapes.includes(shapeIndex)) {
+                        selectedShapes = selectedShapes.filter(index => index !== shapeIndex);
+                    } else {
+                        selectedShapes.push(shapeIndex);
+                    }
+                    drawShapes();
+                }
+                return;
+            }
+    
+            isDrawing = true;
+        });
+    
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing) {
+                const rect = canvas.getBoundingClientRect();
+                currentX = e.clientX - rect.left;
+                currentY = e.clientY - rect.top;
+    
+                if (isSnapping) {
+                    currentX = Math.round(currentX / gridSize) * gridSize;
+                    currentY = Math.round(currentY / gridSize) * gridSize;
+                }
+    
+                drawShapes();
+            }
+        });
+    
+        canvas.addEventListener('mouseup', (e) => {
+            if (isDrawing) {
+                const rect = canvas.getBoundingClientRect();
+                const endX = e.clientX - rect.left;
+                const endY = e.clientY - rect.top;
+    
+                const width = Math.max(endX - startX, 0); // Ensure non-negative width
+                const height = Math.max(endY - startY, 0); // Ensure non-negative height
+    
+                let shape;
+                if (isDrawingLines) {
+                    shape = { type: 'line', startX, startY, endX: currentX, endY: currentY };
+                } else {
+                    shape = { type: 'box', x: startX, y: startY, width: currentX - startX, height: currentY - startY };
+                }
+    
+                shapes.push(shape);
+                addToHistory(shape);
+    
+                isDrawing = false;
+                drawShapes();
+            }
+        });
+    
+        document.getElementById('removeButton').addEventListener('click', () => {
+            isRemoving = !isRemoving;
+            if (!isRemoving) {
+                // Remove all selected shapes
+                shapes = shapes.filter((shape, index) => !selectedShapes.includes(index));
+                selectedShapes = [];
+                drawShapes();
+            }
+            document.getElementById('removeButton').innerText = isRemoving ? 'Done Selecting' : 'Remove';
+        });
+    
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+    
 </body>
 </html>
