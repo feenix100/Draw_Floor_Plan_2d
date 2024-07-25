@@ -1,6 +1,6 @@
 ---
 
-# 2D Floor Plan Drawing Web App
+# 2D Floor Plan Generator Javascript Web App
 
 ## Overview
 
@@ -25,100 +25,6 @@ This web app allows users to draw a 2D floor plan by entering the dimensions of 
 3. **Adjust Dimensions**:
    - As you change the dimensions in the input fields, the floor plan will automatically update to reflect the new values.
 
-## HTML Structure
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Floor Plan Drawer</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        #container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 1;
-        }
-        #floorPlan {
-            background-color: #f0f0f0;
-            display: block;
-        }
-        input {
-            margin: 5px;
-        }
-    </style>
-</head>
-<body>
-    <div id="container">
-        <h1>2D Floor Plan Drawer</h1>
-        <div>
-            <label for="width">Width (px):</label>
-            <input type="number" id="width" min="1">
-            <label for="height">Height (px):</label>
-            <input type="number" id="height" min="1">
-        </div>
-    </div>
-    <canvas id="floorPlan"></canvas>
-    <script src="app.js"></script>
-</body>
-</html>
-```
-
-## JavaScript Functionality
-
-```javascript
-function resizeCanvas() {
-    const canvas = document.getElementById('floorPlan');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    drawFloorPlan(); // Redraw the floor plan when the canvas is resized
-}
-
-function drawFloorPlan() {
-    const canvas = document.getElementById('floorPlan');
-    const ctx = canvas.getContext('2d');
-
-    // Clear the canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Calculate maximum dimensions as 75% of the canvas size
-    const maxWidth = canvas.width * 0.75;
-    const maxHeight = canvas.height * 0.75;
-
-    // Get user inputs
-    const inputWidth = parseInt(document.getElementById('width').value, 10);
-    const inputHeight = parseInt(document.getElementById('height').value, 10);
-
-    // Constrain dimensions to fit within 75% of canvas size
-    const width = isNaN(inputWidth) ? maxWidth : Math.min(inputWidth, maxWidth);
-    const height = isNaN(inputHeight) ? maxHeight : Math.min(inputHeight, maxHeight);
-
-    // Draw the floor plan based on the constrained dimensions
-    ctx.beginPath();
-    ctx.rect((canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-}
-
-// Update the drawing whenever the input fields change
-document.getElementById('width').addEventListener('input', drawFloorPlan);
-document.getElementById('height').addEventListener('input', drawFloorPlan);
-
-// Resize the canvas when the window is resized
-window.addEventListener('resize', resizeCanvas);
-
-// Initial canvas size and drawing
-resizeCanvas();
-```
 
 ## How It Works
 
