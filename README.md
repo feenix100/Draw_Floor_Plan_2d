@@ -5,6 +5,7 @@
 ## Overview
 
 This web app allows users to draw a 2D floor plan for a house or building. Click and drag the mouse to draw a square. It provides a simple and interactive way to visualize floor plans directly in the browser.
+For example this app can be used to create a fire escape plan. 
 
 ## To use: 
 Open ```index.html``` in a browser.
